@@ -38,6 +38,7 @@ class ShopifySettings(Document):
 				
 		except Exception:
 			self.set("enable_shopify", 0)
+			frappe.throw(_("""Invalid Shopify app credentails or access token"""))
 			
 	
 @frappe.whitelist()
@@ -64,10 +65,10 @@ def sync_shopify():
 		except ShopifyError:
 			shopify_settings.erpnext_shopify = 0
 			shopify_settings.save()
-	else:
-		frappe.msgprint(_("""Invalid acess
-			Refer : <a href = 'http://frappe.github.io/erpnext_shopify/user/'>Shopify User Doc</a>"""),
-			raise_exception=1)
+			
+	elif frappe.local.form_dict.cmd == "erpnext_shopify.erpnext_shopify.doctype.shopify_settings.shopify_settings.sync_shopify":
+		frappe.throw(_("""Shopify connector is not enabled. 
+			Click on 'Connect to Shopify' to connect ERPNext and your Shopify store."""))
 							
 def sync_products(price_list, warehouse):
 	sync_shopify_items(warehouse)
