@@ -21,8 +21,12 @@ def sync_products(price_list, warehouse):
 
 def sync_shopify_items(warehouse, shopify_item_list):
 	for shopify_item in get_shopify_items():
-		make_item(warehouse, shopify_item, shopify_item_list)
-		
+		try:
+			make_item(warehouse, shopify_item, shopify_item_list)
+		except ShopifyError, e:
+			 create_log_entry(shopify_item, e)
+			 raise e
+			
 def make_item(warehouse, shopify_item, shopify_item_list):
 	add_item_weight(shopify_item)
 	if has_variants(shopify_item):
@@ -321,9 +325,13 @@ def sync_erpnext_items(price_list, warehouse, shopify_item_list):
 		and (disabled is null or disabled = 0) %s """ % last_sync_condition
 	
 	for item in frappe.db.sql(item_query, as_dict=1):
-		if item.shopify_product_id not in shopify_item_list:
-			sync_item_with_shopify(item, price_list, warehouse)
-
+		if item.name not in shopify_item_list:
+			try:
+				sync_item_with_shopify(item, price_list, warehouse)
+			except ShopifyError, e:
+				create_log_entry(item, e)
+				raise e
+				
 def sync_item_with_shopify(item, price_list, warehouse):
 	variant_item_name_list = []
 

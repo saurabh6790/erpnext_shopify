@@ -60,3 +60,11 @@ cur_frm.fields_dict["cash_bank_account"].get_query = function(doc) {
 		]
 	}
 }
+
+frappe.ui.form.on("Shopify Settings", {
+	refresh: function(frm) {
+		frm.add_custom_button(__("Webhook Requests"), function() {
+			frappe.set_route("List", "Webhook Request Handler");
+		});
+	}
+})
