@@ -1,8 +1,20 @@
-import frappe
-from frappe import _
-from .exceptions import ShopifyError
-from .utils import create_log_entry
+# -*- coding: utf-8 -*-
+# Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and contributors
+# For license information, please see license.txt
 
+from __future__ import unicode_literals
+import frappe
+import hashlib, base64, hmac, json
+from functools import wraps
+from .shopify_requests import get_shopify_settings
+from frappe.exceptions import AuthenticationError
+
+handler_map = {
+	"customers/enable": "erpnext_shopify.sync_customers.enable_customer",
+	"customers/disable": "erpnext_shopify.sync_customers.disable_customer", 
+	"customers/delete": "erpnext_shopify.sync_customers.disable_customer", 
+	"products/delete": "erpnext_shopify.sync_products.disable_item"
+}
 
 
 def shopify_webhook(f):
@@ -19,16 +31,14 @@ def shopify_webhook(f):
 	@wraps(f)
 	def wrapper(*args, **kwargs):
 		# Try to get required headers and decode the body of the request.
-		try:
-			webhook_topic = frappe.local.request.headers.get('X-Shopify-Topic')
-			webhook_hmac	= frappe.local.request.headers.get('X-Shopify-Hmac-Sha256')
-			webhook_data	= frappe._dict(json.loads(frappe.local.request.get_data()))
-		except:
-			raise ValidationError()
+		webhook_topic = frappe.local.request.headers.get('X-Shopify-Topic')
+		webhook_hmac	= frappe.local.request.headers.get('X-Shopify-Hmac-Sha256')
+		webhook_data	= frappe._dict(json.loads(frappe.local.request.get_data()))
 
 		# Verify the HMAC.
-		if get_shopify_settings().password:
-			if not _hmac_is_valid(frappe.local.request.get_data(), get_shopify_settings().password, webhook_hmac):
+		shopify_settings = get_shopify_settings()
+		if shopify_settings.password:
+			if not _hmac_is_valid(frappe.local.request.get_data(), shopify_settings.shared_secret, webhook_hmac):
 				raise AuthenticationError()
 
 			# Otherwise, set properties on the request object and return.
@@ -43,15 +53,17 @@ def shopify_webhook(f):
 @frappe.whitelist(allow_guest=True)
 @shopify_webhook
 def webhook_handler():
-	from webhooks import handler_map
 	topic = frappe.local.request.webhook_topic
 	data = frappe.local.request.webhook_data
 	
-	webhook_handler = frappe.new_doc("Webhook Request Handler")
-	webhook_handler.event = topic
-	webhook_handler.request_data = json.dumps(data)
-	webhook_handler.save(ignore_permissions=True)
-	
-	# handler = handler_map.get(topic)
-# 	if handler:
-# 		handler(data)
+	if not frappe.db.get_value("Webhook Request Handler", {"request_data": json.dumps(data)}, "name"):
+		webhook_handler = frappe.new_doc("Webhook Request Handler")
+		webhook_handler.event = topic
+		webhook_handler.request_data = json.dumps(data)
+		webhook_handler.handler = handler_map.get(topic)
+		webhook_handler.save(ignore_permissions=True)
+
+def call_shopify_webhooks_event_handler():
+	for webhook_request in frappe.get_all("Webhook Request Handler", 
+		filters={"status": "In Queue"}, fields=["*"]):
+		frappe.get_attr(webhook_request.handler)(webhook_request)

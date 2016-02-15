@@ -22,6 +22,7 @@ frappe.ui.form.on("Shopify Settings", "onload", function(frm, dt, dn){
 frappe.ui.form.on("Shopify Settings", "app_type", function(frm, dt, dn) { 
 	frm.toggle_reqd("api_key", (frm.doc.app_type == "Private"));
 	frm.toggle_reqd("password", (frm.doc.app_type == "Private"));
+	frm.toggle_reqd("shared_secret", (frm.doc.app_type == "Private"));
 })
 
 frappe.ui.form.on("Shopify Settings", "refresh", function(frm){

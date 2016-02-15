@@ -3,14 +3,14 @@ import frappe
 import base64
 import datetime
 import requests
+import json
 from frappe import _
 from erpnext.stock.utils import get_bin
 import requests.exceptions
 from .exceptions import ShopifyError
-from frappe.utils import cstr, flt, nowdate, cint, get_files_path
-from .utils import disable_shopify_sync_for_item, disable_shopify_sync_on_exception, create_log_entry
-from .shopify_requests import (get_request, post_request, get_shopify_items, put_request, 
-	get_shopify_item_image)
+from frappe.utils import cstr, flt, cint, get_files_path
+from .utils import create_log_entry
+from .shopify_requests import post_request, get_shopify_items, put_request, get_shopify_item_image
 
 shopify_variants_attr_list = ["option1", "option2", "option3"]
 
@@ -569,3 +569,17 @@ def get_product_update_dict_and_resource(shopify_product_id, shopify_variant_id)
 
 	resource = "admin/products/{}.json".format(shopify_product_id)
 	return item_data, resource
+
+def disable_item(webhook_request):
+	data = json.loads(webhook_request.request_data)
+	
+	name = frappe.db.get_value("Item", {"shopify_product_id": data.get("id")})
+	
+	if name:
+		item = frappe.get_doc("Item", name)
+		item.sync_with_shopify = 0
+		item.disabled = 1
+		item.save()
+	
+	frappe.db.set_value("Webhook Request Handler", webhook_request.name, "status", "Completed")
+	frappe.db.commit()
