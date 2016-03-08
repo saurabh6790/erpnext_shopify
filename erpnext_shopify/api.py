@@ -10,7 +10,7 @@ from .sync_orders import sync_orders
 from .sync_customers import sync_customers
 from frappe.utils.user import get_system_managers
 from .sync_products import sync_products, update_item_stock_qty
-from .utils import disable_shopify_sync_on_exception
+from .utils import disable_shopify_sync_on_exception, create_log_entry
 
 @frappe.whitelist()
 def sync_shopify():
@@ -23,11 +23,9 @@ def sync_shopify():
 @frappe.whitelist()
 def sync_shopify_resources():
 	shopify_settings = frappe.get_doc("Shopify Settings")
-	
 	if shopify_settings.enable_shopify:
 		try :
 			validate_shopify_settings(shopify_settings)
-			
 			sync_products(shopify_settings.price_list, shopify_settings.warehouse)
 			sync_customers()
 			sync_orders()
@@ -50,11 +48,10 @@ def sync_shopify_resources():
 				
 			else:
 				content = _("""Unfortunately shopify sync has terminated. Please check Scheduler Log for more details.""")
-			
+				create_log_entry(e.message, {}, frappe.get_traceback())
+				
 			send_notification_email(subject=subject, content=content)
 			
-			raise e
-
 	elif frappe.local.form_dict.cmd == "erpnext_shopify.api.sync_shopify":
 		frappe.throw(_("""Shopify connector is not enabled. Click on 'Connect to Shopify' to connect ERPNext and your Shopify store."""))
 
