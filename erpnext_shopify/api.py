@@ -35,16 +35,25 @@ def sync_shopify_resources():
 			
 			frappe.db.set_value("Shopify Settings", None, "last_sync_datetime", frappe.utils.now())
 			
+			subject = _("Shopify Sync has completed")
+			content = _(""" Shopify ERPnext sync is completed at %s. """%shopify_settings.last_sync_datetime)
+			
+			send_notification_email(subject, content)
+			
 		except Exception, e:
 			disable_shopify_sync_on_exception()
 			
+			subject = _("Shopify Sync has been disabled")
+			
 			if e.args[0] and e.args[0].startswith("402"):
 				content = _("""Shopify has suspended your account till you complete the payment. We have disabled ERPNext Shopify Sync. Please enable it once your complete the payment at Shopify.""")
-			
-			else:	
-				content = _("""Unfortunately shopify sync has terminated. Please check Scheduler Log for more details.""")
 				
-			frappe.sendmail(get_system_managers(), subject=_("Shopify Sync has been disabled"), content=content)
+			else:
+				content = _("""Unfortunately shopify sync has terminated. Please check Scheduler Log for more details.""")
+			
+			send_notification_email(subject=subject, content=content)
+			
+			raise e
 
 	elif frappe.local.form_dict.cmd == "erpnext_shopify.api.sync_shopify":
 		frappe.throw(_("""Shopify connector is not enabled. Click on 'Connect to Shopify' to connect ERPNext and your Shopify store."""))
@@ -58,3 +67,6 @@ def validate_shopify_settings(shopify_settings):
 		shopify_settings.save()
 	except ShopifyError:
 		disable_shopify_sync_on_exception()
+
+def send_notification_email(subject, content):
+	frappe.sendmail(get_system_managers(), subject=subject, content=content)
